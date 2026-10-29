@@ -453,9 +453,19 @@
       else signal.addEventListener('abort', onAbort, { once: true });
     }
     const timer = setTimeout(() => ctl.abort(), timeout);
+    // The Android app sends requests natively, where the abort signal is ignored,
+    // so the timeout and Stop also race the request here.
+    const aborted = new Promise((_, reject) => {
+      if (ctl.signal.aborted) reject(new Error('aborted'));
+      else ctl.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    });
+    aborted.catch(() => {});
     let res;
     try {
-      res = await fetch(url, { method, headers, body: body == null ? undefined : JSON.stringify(body), signal: ctl.signal });
+      res = await Promise.race([
+        fetch(url, { method, headers, body: body == null ? undefined : JSON.stringify(body), signal: ctl.signal }),
+        aborted,
+      ]);
     } catch (e) {
       const err = new Error(signal && signal.aborted ? 'aborted' : 'network');
       err.kind = signal && signal.aborted ? 'aborted' : (ctl.signal.aborted ? 'timeout' : 'network');
