@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Human</title>
+<meta name="description" content="Paste a sentence, get three human-sounding rewrites, and tap any word for five synonyms that fit.">
+<meta name="theme-color" content="#F6F7FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1220" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/favicon-64.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="fonts/literata-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/schibsted-grotesk-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand">
+      <span class="logo">Human</span>
+      <span class="tagline">Say it three ways. Tap a word for five more.</span>
+    </div>
+    <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.6 7.6 0 0 0 7 6.5l-2.4-1-2 3.4 2 1.6a7.7 7.7 0 0 0 0 3l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.6Z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="update-bar" id="updateBar" hidden>
+  <div class="wrap update-inner">
+    <p class="update-text" id="updateText">A new version is ready.</p>
+    <div class="update-actions">
+      <button class="btn small ghost" id="updateLater" type="button">Later</button>
+      <button class="btn small primary" id="updateNow" type="button">Update</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap main">
+  <section class="composer" aria-label="Your text">
+    <label for="input" class="label">Your text</label>
+    <textarea id="input" rows="4" maxlength="1500" placeholder="Paste a sentence or a short paragraph…" spellcheck="true"></textarea>
+    <div class="composer-row">
+      <span class="count" id="count">0 / 1,500</span>
+      <div class="composer-actions">
+        <button class="btn ghost" id="pasteBtn" type="button">Paste</button>
+        <button class="btn ghost" id="clearBtn" type="button">Clear</button>
+        <button class="btn primary" id="goBtn" type="button">Rewrite</button>
+      </div>
+    </div>
+    <p class="keynote" id="keynote" hidden>
+      Rewrites need a free AI key. Words are still tappable for synonyms.
+      <button class="link" type="button" data-open-settings>Add a free key</button>
+    </p>
+  </section>
+
+  <div class="status" id="status" role="status" aria-live="polite" hidden></div>
+
+  <section class="results" id="results" aria-label="Rewrites"></section>
+</main>
+
+<footer class="final" id="finalBar" hidden>
+  <div class="wrap final-inner">
+    <div class="final-text">
+      <span class="label">Your new text</span>
+      <p class="final-preview" id="finalPreview"></p>
+    </div>
+    <button class="btn primary" id="copyAllBtn" type="button">Copy</button>
+  </div>
+</footer>
+
+<div class="bubble" id="bubble" role="dialog" aria-label="Synonyms" hidden>
+  <div class="bubble-head">
+    <div class="headword">
+      <span class="hw" id="bwWord"></span>
+      <span class="pos" id="bwPos"></span>
+    </div>
+    <button class="icon-btn sm" id="bubbleClose" type="button" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <p class="def" id="bwDef" hidden></p>
+  <p class="chips-label" id="bwLabel">Fits this sentence</p>
+  <div class="chips" id="bwChips"></div>
+  <div class="more" id="bwMoreWrap" hidden>
+    <button class="link small" id="bwMoreBtn" type="button" aria-expanded="false">More from the dictionary</button>
+    <div class="chips minor" id="bwMore" hidden></div>
+  </div>
+  <div class="revert" id="bwRevertWrap" hidden>
+    <button class="chip revert-chip" id="bwRevert" type="button"></button>
+  </div>
+  <p class="src" id="bwSrc"></p>
+  <span class="arrow" id="bubbleArrow" aria-hidden="true"></span>
+</div>
+
+<div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-head">
+    <h2 id="sheetTitle">Settings</h2>
+    <button class="icon-btn" id="sheetClose" type="button" aria-label="Close settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <p class="sheet-intro" id="sheetIntro" hidden></p>
+
+    <h3 class="sheet-h">AI for rewrites</h3>
+    <div class="seg" role="radiogroup" aria-label="AI service" id="providerSeg">
+      <button type="button" role="radio" data-provider="groq">Groq</button>
+      <button type="button" role="radio" data-provider="gemini">Gemini</button>
+      <button type="button" role="radio" data-provider="openrouter">OpenRouter</button>
+    </div>
+    <p class="provider-note" id="providerNote"></p>
+
+    <ol class="steps">
+      <li>Open <a id="keyLink" href="#" target="_blank" rel="noopener">the free key page</a> and sign in.</li>
+      <li>Create a key and copy it.</li>
+      <li>Paste it below and tap <strong>Save &amp; test</strong>.</li>
+    </ol>
+
+    <label class="label" for="keyInput">Your key</label>
+    <div class="key-row">
+      <input id="keyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste key here">
+      <button class="btn ghost small" id="keyShow" type="button" aria-pressed="false">Show</button>
+    </div>
+
+    <label class="label" for="modelSelect">Model</label>
+    <select id="modelSelect"></select>
+    <p class="hint" id="modelHint"></p>
+
+    <div class="sheet-actions">
+      <button class="btn primary" id="saveKeyBtn" type="button">Save &amp; test</button>
+      <button class="btn ghost" id="removeKeyBtn" type="button">Remove key</button>
+    </div>
+    <p class="test-result" id="testResult" role="status" aria-live="polite"></p>
+    <p class="hint">Your key is saved only on this device and is sent only to the service you picked.</p>
+
+    <h3 class="sheet-h">Dictionaries</h3>
+    <p class="hint">Synonyms come from <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener">Datamuse</a> and the <a href="https://dictionaryapi.dev/" target="_blank" rel="noopener">Free Dictionary API</a>. With a key, the AI picks the five that fit your sentence.</p>
+
+    <h3 class="sheet-h">App</h3>
+    <p class="version-line">Version <span id="versionName">dev</span></p>
+    <div class="app-native" id="appNative" hidden>
+      <button class="btn ghost" id="checkUpdateBtn" type="button">Check for updates</button>
+      <p class="hint" id="updateResult" role="status" aria-live="polite"></p>
+    </div>
+    <div class="app-web" id="appWeb">
+      <a class="btn ghost" id="apkLink" href="https://github.com/NoorJ29/Human/releases/latest" target="_blank" rel="noopener">Get the Android app</a>
+    </div>
+  </div>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span id="toastText"></span>
+  <button class="link" id="toastAction" type="button" hidden></button>
+</div>
+
+<script src="vendor/capacitor.js"></script>
+<script src="version.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+name: Build app and website
+
+# Every push to main builds a new Android APK, publishes it as the latest
+# GitHub release (the app checks this to offer in-app updates), and deploys
+# the website to GitHub Pages (from the gh-pages branch).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APP_VERSION_CODE: ${{ github.run_number }}
+  APP_VERSION_NAME: 1.0.${{ github.run_number }}
+
+jobs:
+  website:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp version
+        run: |
+          printf 'window.APP_VERSION = { code: %s, name: "%s" };\n' "$APP_VERSION_CODE" "$APP_VERSION_NAME" > web/version.js
+          cat web/version.js
+
+      - name: Publish website to the gh-pages branch
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          cd web
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Website $APP_VERSION_NAME"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Stamp version
+        run: |
+          printf 'window.APP_VERSION = { code: %s, name: "%s" };\n' "$APP_VERSION_CODE" "$APP_VERSION_NAME" > web/version.js
+          cat web/version.js
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Prepare signing key
+        env:
+          HUMAN_SIGNING_PASSPHRASE: ${{ secrets.HUMAN_SIGNING_PASSPHRASE }}
+        run: |
+          STOREPASS="$(openssl rand -hex 24)"
+          echo "::add-mask::$STOREPASS"
+          echo "HUMAN_KEYSTORE_PASSWORD=$STOREPASS" >> "$GITHUB_ENV"
+          if [ -n "$HUMAN_SIGNING_PASSPHRASE" ]; then
+            pip install --quiet cryptography
+            python tools/signing.py keystore android/signing/human-cert.pem android/app/human.p12 "$STOREPASS"
+            echo "SIGNED_STABLE=true" >> "$GITHUB_ENV"
+          else
+            echo "::warning title=Signing secret missing::Add the HUMAN_SIGNING_PASSPHRASE repository secret so every build installs over the last one. This build uses a throwaway key and is published as a test pre-release."
+            keytool -genkeypair -storetype PKCS12 -keystore android/app/human.p12 \
+              -storepass "$STOREPASS" -keypass "$STOREPASS" -alias human \
+              -keyalg EC -groupname secp256r1 -validity 3650 -dname "CN=Human test build"
+            echo "SIGNED_STABLE=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install
+        run: npm ci
+
+      - name: Copy the website into the app
+        run: npx cap sync android
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -PappVersionCode="$APP_VERSION_CODE" \
+            -PappVersionName="$APP_VERSION_NAME"
+
+      - name: Check the APK
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk Human.apk
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs Human.apk | tee signer.txt
+          "$BT/aapt2" dump badging Human.apk | grep -E "^package|^application-label|uses-permission" || true
+          if [ "$SIGNED_STABLE" = "true" ]; then
+            WANT="$(openssl x509 -in android/signing/human-cert.pem -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr 'A-F' 'a-f')"
+            grep -q "SHA-256 digest: $WANT" signer.txt || { echo "::error::APK is not signed with the Human key"; exit 1; }
+            echo "Signed with the Human key ($WANT)"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Human-${{ env.APP_VERSION_NAME }}
+          path: Human.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="$(git log -1 --pretty=%s)"
+          if [ "$SIGNED_STABLE" = "true" ]; then
+            gh release create "v$APP_VERSION_NAME" Human.apk \
+              --title "Human $APP_VERSION_NAME" --notes "$NOTES" \
+              --target "$GITHUB_SHA" --latest
+          else
+            gh release create "v$APP_VERSION_NAME" Human.apk \
+              --title "Human $APP_VERSION_NAME (test build)" \
+              --notes "Test build signed with a temporary key, so it will not update an installed copy. Add the HUMAN_SIGNING_PASSPHRASE secret to publish normal releases. $NOTES" \
+              --target "$GITHUB_SHA" --prerelease
+          fi

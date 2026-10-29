@@ -1,0 +1,13 @@
+{
+  "appId": "com.noorj29.human",
+  "appName": "Human",
+  "webDir": "web",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}

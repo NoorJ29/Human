@@ -1,0 +1,19 @@
+{
+  "name": "human",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Paste a sentence, get three human-sounding rewrites, and tap any word for five synonyms that fit. Website + Android app.",
+  "scripts": {
+    "serve": "npx --yes http-server web -p 8080 -c-1",
+    "sync": "npx cap sync android",
+    "apk": "npx cap sync android && cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Human</string>
+    <string name="title_activity_main">Human</string>
+    <string name="package_name">com.noorj29.human</string>
+    <string name="custom_url_scheme">com.noorj29.human</string>
+</resources>
